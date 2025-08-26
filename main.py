@@ -11,7 +11,7 @@ st.set_page_config(
 
 # --- App Introduction and Title ---
 st.title("📈 Alpha Vantage Stock Analyzer")
-st.markdown("Enter a stock ticker to see its recent price performance and a buy/sell recommendation based on moving averages.")
+st.markdown("Enter a stock ticker to see its recent price performance and a buy/sell recommendation based on moving averages and RSI.")
 
 # --- API Key Input ---
 api_key = st.text_input(
@@ -34,7 +34,7 @@ def get_alpha_vantage_data(api_key, ticker, function, interval="daily", time_per
     Args:
         api_key (str): Your Alpha Vantage API key.
         ticker (str): The stock ticker symbol.
-        function (str): The API function to call (e.g., TIME_SERIES_DAILY, SMA).
+        function (str): The API function to call (e.g., TIME_SERIES_DAILY, SMA, RSI).
         interval (str): The time interval (e.g., 'daily').
         time_period (int): The number of data points for the technical indicator.
     
@@ -63,13 +63,16 @@ if api_key and ticker_symbol:
         # Fetch 200-day SMA data
         sma_200_data = get_alpha_vantage_data(api_key, ticker_symbol, "SMA", interval="daily", time_period=200)
 
-    if price_data and sma_50_data and sma_200_data:
+        # Fetch 14-day RSI data
+        rsi_data = get_alpha_vantage_data(api_key, ticker_symbol, "RSI", interval="daily", time_period=14)
+
+    if price_data and sma_50_data and sma_200_data and rsi_data:
         # Check for API errors in the response
-        if "Error Message" in price_data or "Error Message" in sma_50_data or "Error Message" in sma_200_data:
+        if "Error Message" in price_data or "Error Message" in sma_50_data or "Error Message" in sma_200_data or "Error Message" in rsi_data:
             st.error("Alpha Vantage API error: One of the data requests failed. Please check your API key and ticker symbol.")
-        elif "Note" in price_data or "Note" in sma_50_data or "Note" in sma_200_data:
+        elif "Note" in price_data or "Note" in sma_50_data or "Note" in sma_200_data or "Note" in rsi_data:
             st.warning("Alpha Vantage API rate limit reached. Please wait a minute and try again.")
-        elif "Time Series (Daily)" in price_data and "Technical Analysis: SMA" in sma_50_data and "Technical Analysis: SMA" in sma_200_data:
+        elif "Time Series (Daily)" in price_data and "Technical Analysis: SMA" in sma_50_data and "Technical Analysis: SMA" in sma_200_data and "Technical Analysis: RSI" in rsi_data:
             # Parse price data
             price_history = price_data["Time Series (Daily)"]
             price_df = pd.DataFrame.from_dict(price_history, orient='index', dtype=float)
@@ -89,9 +92,16 @@ if api_key and ticker_symbol:
             sma_200_df.index = pd.to_datetime(sma_200_df.index)
             sma_200_df = sma_200_df.rename(columns={"SMA": "SMA_200"})
             sma_200_df = sma_200_df.sort_index()
+            
+            # Parse RSI data
+            rsi_history = rsi_data["Technical Analysis: RSI"]
+            rsi_df = pd.DataFrame.from_dict(rsi_history, orient='index', dtype=float)
+            rsi_df.index = pd.to_datetime(rsi_df.index)
+            rsi_df = rsi_df.rename(columns={"RSI": "RSI"})
+            rsi_df = rsi_df.sort_index()
 
             # Merge data for charting and analysis
-            chart_df = pd.concat([price_df['Close'], sma_50_df['SMA_50'], sma_200_df['SMA_200']], axis=1)
+            chart_df = pd.concat([price_df['Close'], sma_50_df['SMA_50'], sma_200_df['SMA_200'], rsi_df['RSI']], axis=1)
 
             # Filter data to the past 5 years
             five_years_ago = date.today() - timedelta(days=5*365)
@@ -99,19 +109,33 @@ if api_key and ticker_symbol:
 
             # --- Displaying Data ---
             st.subheader("Price and Moving Averages")
-            st.line_chart(chart_df)
+            st.line_chart(chart_df[['Close', 'SMA_50', 'SMA_200']])
+            
+            st.subheader("Relative Strength Index (RSI)")
+            st.line_chart(chart_df['RSI'])
             
             # --- Buy/Sell Recommendation Logic ---
             if not chart_df.empty and len(chart_df) > 1:
-                latest_close = chart_df['Close'].iloc[-1]
-                latest_50_sma = chart_df['SMA_50'].iloc[-1]
-                latest_200_sma = chart_df['SMA_200'].iloc[-1]
+                latest_price_data = chart_df.iloc[-1]
+                latest_50_sma = latest_price_data['SMA_50']
+                latest_200_sma = latest_price_data['SMA_200']
+                latest_rsi = latest_price_data['RSI']
 
+                st.subheader("Trading Signals")
+                
                 # Compare the latest SMA values to generate a signal
                 if latest_50_sma > latest_200_sma:
-                    st.success("✅ **BUY SIGNAL** - The 50-day SMA is above the 200-day SMA, indicating potential upward momentum.")
+                    st.success("✅ **SMA BUY SIGNAL** - The 50-day SMA is above the 200-day SMA, indicating potential upward momentum.")
                 else:
-                    st.error("❌ **SELL SIGNAL** - The 50-day SMA is below the 200-day SMA, indicating potential downward momentum.")
+                    st.error("❌ **SMA SELL SIGNAL** - The 50-day SMA is below the 200-day SMA, indicating potential downward momentum.")
+                
+                # Compare the latest RSI value to generate a signal
+                if latest_rsi < 30:
+                    st.success("✅ **RSI BUY SIGNAL** - The RSI is below 30, indicating the stock may be oversold.")
+                elif latest_rsi > 70:
+                    st.error("❌ **RSI SELL SIGNAL** - The RSI is above 70, indicating the stock may be overbought.")
+                else:
+                    st.info("ℹ️ **RSI NEUTRAL** - The RSI is between 30 and 70, with no strong signal.")
             
             # --- Key Metrics ---
             st.subheader("Key Metrics")
@@ -120,6 +144,7 @@ if api_key and ticker_symbol:
                 "Latest Close Price": f"${latest_price['Close']:.2f}",
                 "Latest 50-day SMA": f"${latest_price['SMA_50']:.2f}",
                 "Latest 200-day SMA": f"${latest_price['SMA_200']:.2f}",
+                "Latest 14-day RSI": f"{latest_price['RSI']:.2f}",
                 "Data as of": latest_price.name.strftime('%Y-%m-%d')
             })
 
