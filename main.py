@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import requests
-from datetime import date
+from datetime import date, timedelta
 
 # Set the page title and favicon
 st.set_page_config(
@@ -92,6 +92,10 @@ if api_key and ticker_symbol:
 
             # Merge data for charting and analysis
             chart_df = pd.concat([price_df['Close'], sma_50_df['SMA_50'], sma_200_df['SMA_200']], axis=1)
+
+            # Filter data to the past 5 years
+            five_years_ago = date.today() - timedelta(days=5*365)
+            chart_df = chart_df[chart_df.index >= pd.to_datetime(five_years_ago)]
 
             # --- Displaying Data ---
             st.subheader("Price and Moving Averages")
