@@ -6,10 +6,10 @@ import streamlit as st
 import pandas as pd
 import requests
 from datetime import date, timedelta
-from sklearn.linear_model import LinearRegression
-from sklearn.svm import SVC
-from sklearn.neighbors import KNeighborsClassifier
-import numpy as np
+
+# Import the refactored signal and forecast modules
+from regular_signals import display_regular_signals
+from ai_signals import display_ai_forecasts
 
 # Set the page title and favicon
 st.set_page_config(
@@ -21,11 +21,12 @@ st.set_page_config(
 st.title("📈 Alpha Vantage Stock Analyzer")
 st.markdown("Enter a stock ticker to see its recent price performance and a buy/sell recommendation based on moving averages, RSI, MACD, and several simple AI forecasts.")
 
-# --- API Key Input ---
-api_key = st.text_input(
-    "Enter your Alpha Vantage API Key:",
-    type="password" # This hides the key as the user types
-)
+# --- API Key from Secrets ---
+try:
+    api_key = st.secrets["api_key"]
+except KeyError:
+    st.error("API key not found. Please add it to your Streamlit secrets.")
+    api_key = None # Set to None to prevent further execution
 
 # --- User Input Section ---
 ticker_symbol = st.text_input(
@@ -163,65 +164,7 @@ if api_key and ticker_symbol:
             # Check if chart_df is still not empty after filtering
             if not chart_df.empty:
                 # --- AI-Powered Forecast Logic ---
-                if len(chart_df) > 30:
-                    st.subheader("AI-Powered Forecasts")
-                    st.info("ℹ️ Note: These are simple machine learning models for demonstration. They should not be used for real-world financial decisions.")
-                    
-                    # Create a copy and fill missing values for the model
-                    forecast_df = chart_df.copy()
-                    
-                    # Create a target variable (y) and features (X)
-                    # We'll predict the next day's closing price change direction (up/down)
-                    forecast_df['Price_Change'] = np.where(forecast_df['Close'].shift(-1) > forecast_df['Close'], 1, 0)
-                    
-                    # Drop the last row which has a NaN target
-                    forecast_df.dropna(inplace=True)
-                    
-                    # Define features and target
-                    features = [col for col in ['Close', 'SMA_50', 'SMA_200', 'RSI', 'MACD', 'MACD_Signal'] if col in forecast_df.columns]
-                    
-                    # Check if all necessary features for AI models exist
-                    if len(features) > 1 and 'Price_Change' in forecast_df.columns:
-                        X = forecast_df[features]
-                        y = forecast_df['Price_Change']
-                        
-                        # --- Linear Regression Model (Price Prediction) ---
-                        price_model = LinearRegression()
-                        price_model.fit(X, forecast_df['Close'].shift(-1).dropna())
-                        
-                        latest_data = forecast_df.iloc[-1][features].values.reshape(1, -1)
-                        next_day_price_pred = price_model.predict(latest_data)[0]
-                        
-                        st.write(f"The **Linear Regression** model predicts the next closing price will be: **${next_day_price_pred:.2f}**")
-                        if next_day_price_pred > latest_data[0][0]:
-                            st.success("✅ **AI BUY SIGNAL (Linear Regression)** - The model predicts the price will increase.")
-                        else:
-                            st.error("❌ **AI SELL SIGNAL (Linear Regression)** - The model predicts the price will decrease.")
-
-                        # --- SVC Model (Buy/Sell Prediction) ---
-                        svc_model = SVC(kernel='linear', C=1)
-                        svc_model.fit(X, y)
-                        svc_pred = svc_model.predict(latest_data)[0]
-                        
-                        if svc_pred == 1:
-                            st.success("✅ **AI BUY SIGNAL (SVC)** - The SVC model predicts an upward price movement.")
-                        else:
-                            st.error("❌ **AI SELL SIGNAL (SVC)** - The SVC model predicts a downward price movement.")
-
-                        # --- KNN Model (Buy/Sell Prediction) ---
-                        knn_model = KNeighborsClassifier(n_neighbors=5)
-                        knn_model.fit(X, y)
-                        knn_pred = knn_model.predict(latest_data)[0]
-                        
-                        if knn_pred == 1:
-                            st.success("✅ **AI BUY SIGNAL (KNN)** - The KNN model predicts an upward price movement.")
-                        else:
-                            st.error("❌ **AI SELL SIGNAL (KNN)** - The KNN model predicts a downward price movement.")
-
-                    else:
-                        st.warning("Could not train the AI models. Missing necessary data.")
-                else:
-                    st.warning("Not enough data to train the AI models.")
+                display_ai_forecasts(chart_df)
                 
                 # --- Displaying Data ---
                 st.subheader("Price and Moving Averages")
@@ -247,40 +190,7 @@ if api_key and ticker_symbol:
                     st.warning("MACD data is not available.")
                 
                 # --- Buy/Sell Recommendation Logic ---
-                if len(chart_df) > 1:
-                    latest_price_data = chart_df.iloc[-1]
-                    
-                    st.subheader("Traditional Trading Signals")
-                    
-                    # SMA Crossover Signal (Only show if data is available)
-                    if 'SMA_50' in chart_df.columns and 'SMA_200' in chart_df.columns:
-                        latest_50_sma = latest_price_data['SMA_50']
-                        latest_200_sma = latest_price_data['SMA_200']
-                        if latest_50_sma > latest_200_sma:
-                            st.success("✅ **SMA BUY SIGNAL** - The 50-day SMA is above the 200-day SMA, indicating potential upward momentum.")
-                        else:
-                            st.error("❌ **SMA SELL SIGNAL** - The 50-day SMA is below the 200-day SMA, indicating potential downward momentum.")
-                    else:
-                        st.info("ℹ️ **SMA Signal Not Available** - SMA data is missing.")
-
-                    # RSI Signal (Only show if data is available)
-                    if 'RSI' in chart_df.columns:
-                        latest_rsi = latest_price_data['RSI']
-                        if latest_rsi < 30:
-                            st.success("✅ **RSI BUY SIGNAL** - The RSI is below 30, indicating the stock may be oversold.")
-                        elif latest_rsi > 70:
-                            st.error("❌ **RSI SELL SIGNAL** - The RSI is above 70, indicating the stock may be overbought.")
-                        else:
-                            st.info("ℹ️ **RSI NEUTRAL** - The RSI is between 30 and 70, with no strong signal.")
-                        
-                    # MACD Crossover Signal (Only show if data is available)
-                    if 'MACD' in chart_df.columns and 'MACD_Signal' in chart_df.columns:
-                        latest_macd = latest_price_data['MACD']
-                        latest_macd_signal = latest_price_data['MACD_Signal']
-                        if latest_macd > latest_macd_signal:
-                            st.success("✅ **MACD BUY SIGNAL** - The MACD line is above the signal line, suggesting potential bullish momentum.")
-                        else:
-                            st.error("❌ **MACD SELL SIGNAL** - The MACD line is below the signal line, suggesting potential bearish momentum.")
+                display_regular_signals(chart_df)
                 
                 # --- Key Metrics ---
                 st.subheader("Key Metrics")
