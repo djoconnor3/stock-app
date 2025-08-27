@@ -33,7 +33,7 @@ try:
     # This is the corrected line to access the nested key
     api_key = st.secrets["general"]["api_key"]
     # We will use this API key for the Gemini API call as well
-    gemini_api_key = os.environ.get("GEMINI_API_KEY", "")
+    gemini_api_key = os.environ.get("gemini_api_key", "")
 except KeyError:
     st.error("API key not found. Please add it to your Streamlit secrets.")
     api_key = None # Set to None to prevent further execution
