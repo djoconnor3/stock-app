@@ -305,7 +305,7 @@ if api_key and ticker_symbol:
 elif not api_key:
     st.info("Please enter your Alpha Vantage API key to get started.")
 else:
-    st.info("Please enter a stock ticker symbol to get started.")except KeyError:
+    st.info("Please enter a stock ticker symbol to get started.") except KeyError:
     st.error("API key not found. Please add it to your Streamlit secrets.")
     api_key = None # Set to None to prevent further execution
 
