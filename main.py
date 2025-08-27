@@ -21,9 +21,8 @@ st.set_page_config(
 st.title("📈 Alpha Vantage Stock Analyzer")
 st.markdown("Enter a stock ticker to see its recent price performance and a buy/sell recommendation based on moving averages, RSI, MACD, and several simple AI forecasts.")
 
-# --- API Key from Secrets ---
 try:
-    api_key = st.secrets["api_key"]
+    api_key = st.secrets["general"]["api_key"]
 except KeyError:
     st.error("API key not found. Please add it to your Streamlit secrets.")
     api_key = None # Set to None to prevent further execution
