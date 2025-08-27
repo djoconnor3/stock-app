@@ -1,5 +1,5 @@
 # To run this app, use the following command in your terminal:
-# pip install scikit-learn pandas
+# pip install scikit-learn pandas streamlit requests
 # python3 -m streamlit run main.py --server.port 8502 --server.address 0.0.0.0
 
 import streamlit as st
@@ -258,7 +258,17 @@ if api_key and ticker_symbol:
             st.markdown("---")
             st.write(f"Data sourced from Alpha Vantage as of {date.today()}.")
         else:
+            # Fallback for unexpected response structure.
             st.error(f"Could not retrieve all necessary data for the ticker symbol: **{ticker_symbol}**. The API returned an unknown response format. Please check your API key and ticker symbol.")
+            st.write("---")
+            st.write("For debugging, here is the raw API response:")
+            st.json({
+                "price_data": price_data,
+                "sma_50_data": sma_50_data,
+                "sma_200_data": sma_200_data,
+                "rsi_data": rsi_data,
+                "macd_data": macd_data
+            })
     
 elif not api_key:
     st.info("Please enter your Alpha Vantage API key to get started.")
