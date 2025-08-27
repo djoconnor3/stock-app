@@ -1,27 +1,38 @@
 # To run this app, use the following command in your terminal:
-# pip install scikit-learn pandas streamlit requests
 # python3 -m streamlit run main.py --server.port 8502 --server.address 0.0.0.0
 
+# Import the necessary Streamlit library
 import streamlit as st
 import pandas as pd
 import requests
 from datetime import date, timedelta
-
-# Import the refactored signal and forecast modules
+from sklearn.linear_model import LinearRegression
+from sklearn.svm import SVC
+from sklearn.neighbors import KNeighborsClassifier
+import numpy as np
 from regular_signals import display_regular_signals
 from ai_signals import display_ai_forecasts
 
-# Set the page title and favicon
-st.set_page_config(
-    page_title="Alpha Vantage Stock Analyzer",
-    page_icon="📈"
-)
+# =============================================================================
+# Streamlit App
+# =============================================================================
+
+# Set the page title and a simple layout
+st.set_page_config(page_title="Alpha Vantage Stock Analyzer", layout="centered")
+
+# Display the title of the app
+st.title("Hello, World! 👋")
+
+# Display a simple message using markdown
+st.markdown("This is a basic Streamlit application.")
 
 # --- App Introduction and Title ---
 st.title("📈 Alpha Vantage Stock Analyzer")
 st.markdown("Enter a stock ticker to see its recent price performance and a buy/sell recommendation based on moving averages, RSI, MACD, and several simple AI forecasts.")
 
+# --- API Key from Secrets ---
 try:
+    # This is the corrected line to access the nested key
     api_key = st.secrets["general"]["api_key"]
 except KeyError:
     st.error("API key not found. Please add it to your Streamlit secrets.")
